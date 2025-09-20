@@ -386,11 +386,27 @@ impl GhostOrchestrator {
     }
 
     fn estimate_tokens(&self, request: &ChatCompletionRequest) -> u32 {
-        // Simple token estimation
-        let total_chars: usize = request.messages.iter()
-            .map(|m| m.content.len())
-            .sum();
-        (total_chars / 4) as u32
+        // Token estimation including vision support
+        let mut total_tokens = 0u32;
+
+        for message in &request.messages {
+            // Text content
+            total_tokens += (message.content.text().len() / 4) as u32;
+
+            // Vision tokens for multimodal content
+            if let Some(images) = message.content.images() {
+                for image in images {
+                    let image_tokens = match &image.detail {
+                        Some(crate::types::ImageDetail::Low) => 85,
+                        Some(crate::types::ImageDetail::High) => 765,
+                        _ => 425,
+                    };
+                    total_tokens += image_tokens;
+                }
+            }
+        }
+
+        total_tokens
     }
 
     fn estimate_cost(&self, response: &ChatCompletionResponse, service_name: &str) -> f64 {

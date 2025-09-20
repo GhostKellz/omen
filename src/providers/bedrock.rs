@@ -292,7 +292,7 @@ impl BedrockProvider {
                     if !system_prompt.is_empty() {
                         system_prompt.push('\n');
                     }
-                    system_prompt.push_str(&msg.content);
+                    system_prompt.push_str(&msg.content.text());
                 }
                 "user" | "assistant" => {
                     anthropic_messages.push(json!({
@@ -409,7 +409,7 @@ impl BedrockProvider {
                 index: 0,
                 message: ChatMessage {
                     role: "assistant".to_string(),
-                    content,
+                    content: crate::types::MessageContent::Text(content),
                     name: None,
                     tool_calls: None,
                     tool_call_id: None,

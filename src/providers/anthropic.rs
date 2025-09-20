@@ -50,7 +50,7 @@ impl AnthropicProvider {
                     if !system_message.is_empty() {
                         system_message.push('\n');
                     }
-                    system_message.push_str(&msg.content);
+                    system_message.push_str(&msg.content.text());
                 }
                 "user" | "assistant" => {
                     anthropic_messages.push(json!({
@@ -92,7 +92,7 @@ impl AnthropicProvider {
                 index: 0,
                 message: ChatMessage {
                     role: "assistant".to_string(),
-                    content,
+                    content: crate::types::MessageContent::Text(content),
                     name: None,
                     tool_calls: None,
                     tool_call_id: None,

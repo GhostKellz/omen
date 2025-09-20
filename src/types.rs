@@ -35,13 +35,103 @@ pub struct ChatCompletionRequest {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChatMessage {
     pub role: String,
-    pub content: String,
+    #[serde(flatten)]
+    pub content: MessageContent,
     #[serde(default)]
     pub name: Option<String>,
     #[serde(default)]
     pub tool_calls: Option<Vec<ToolCall>>,
     #[serde(default)]
     pub tool_call_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum MessageContent {
+    Text(String),
+    MultiModal {
+        text: String,
+        images: Vec<ImageContent>,
+    },
+}
+
+impl MessageContent {
+    pub fn text(&self) -> &str {
+        match self {
+            MessageContent::Text(text) => text,
+            MessageContent::MultiModal { text, .. } => text,
+        }
+    }
+
+    pub fn images(&self) -> Option<&[ImageContent]> {
+        match self {
+            MessageContent::Text(_) => None,
+            MessageContent::MultiModal { images, .. } => Some(images),
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        self.text().len()
+    }
+
+    pub fn is_multimodal(&self) -> bool {
+        matches!(self, MessageContent::MultiModal { .. })
+    }
+
+    pub fn to_lowercase(&self) -> String {
+        self.text().to_lowercase()
+    }
+}
+
+impl std::fmt::Display for MessageContent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            MessageContent::Text(text) => write!(f, "{}", text),
+            MessageContent::MultiModal { text, images } => {
+                write!(f, "{}", text)?;
+                if !images.is_empty() {
+                    write!(f, " [+{} image(s)]", images.len())?;
+                }
+                Ok(())
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ImageContent {
+    #[serde(rename = "type")]
+    pub image_type: ImageType,
+    pub data: ImageData,
+    #[serde(default)]
+    pub detail: Option<ImageDetail>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ImageType {
+    #[serde(rename = "image_url")]
+    ImageUrl,
+    #[serde(rename = "image_base64")]
+    ImageBase64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum ImageData {
+    Url { url: String },
+    Base64 {
+        media_type: String, // e.g., "image/jpeg", "image/png"
+        data: String,       // base64 encoded image
+    },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ImageDetail {
+    Low,
+    High,
+    Auto,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -1,5 +1,6 @@
 use crate::{
     billing::BillingManager,
+    cache::RedisCache,
     config::Config,
     error::{OmenError, Result},
     ghost_ai::GhostOrchestrator,
@@ -21,6 +22,7 @@ pub struct OmenRouter {
     advanced_router: Arc<tokio::sync::Mutex<AdvancedRouter>>,
     billing_manager: Arc<BillingManager>,
     rate_limiter: Arc<AdaptiveRateLimiter>,
+    pub cache: Option<Arc<RedisCache>>,
 }
 
 impl OmenRouter {
@@ -30,6 +32,32 @@ impl OmenRouter {
         let billing_manager = Arc::new(BillingManager::new());
         let rate_limiter = Arc::new(AdaptiveRateLimiter::new(billing_manager.clone()));
 
+        // Initialize Redis cache if enabled
+        let cache = if config.cache.enabled {
+            match RedisCache::new(crate::cache::CacheConfig {
+                redis_url: config.cache.redis_url.clone(),
+                default_ttl_seconds: config.cache.default_ttl_seconds,
+                response_cache_ttl: config.cache.response_cache_ttl,
+                session_cache_ttl: config.cache.session_cache_ttl,
+                rate_limit_ttl: config.cache.rate_limit_ttl,
+                provider_health_ttl: config.cache.provider_health_ttl,
+                max_cache_size_mb: config.cache.max_cache_size_mb,
+            }) {
+                Ok(cache) => {
+                    cache.warm_cache().await?;
+                    info!("🔥 Redis cache initialized and warmed up");
+                    Some(Arc::new(cache))
+                }
+                Err(e) => {
+                    warn!("Failed to initialize Redis cache: {}. Continuing without cache.", e);
+                    None
+                }
+            }
+        } else {
+            info!("📦 Redis cache disabled in configuration");
+            None
+        };
+
         info!("✅ OMEN router initialized with {} providers", providers.len());
 
         Ok(Self {
@@ -38,11 +66,31 @@ impl OmenRouter {
             advanced_router,
             billing_manager,
             rate_limiter,
+            cache,
         })
     }
 
     pub async fn chat_completion(&self, request: ChatCompletionRequest, context: RequestContext) -> Result<ChatCompletionResponse> {
-        // Check billing and rate limits first
+        // Check cache first for identical requests
+        if let (Some(cache), Some(ref user_id)) = (&self.cache, &context.user_id) {
+            let cache_key = cache.generate_response_cache_key(
+                user_id,
+                &request.messages,
+                &request.model,
+                request.temperature,
+            );
+
+            if let Ok(Some(cached)) = cache.get_cached_response(&cache_key).await {
+                info!("💾 Cache HIT for user {}: ${:.4} saved", user_id, cached.cost_usd);
+
+                // Update cache hit count
+                let _ = cache.increment_cache_hit(&cache_key).await;
+
+                return Ok(cached.response);
+            }
+        }
+
+        // Check billing and rate limits
         if let Some(ref user_id) = context.user_id {
             let can_proceed = self.billing_manager.check_request_allowed(user_id).await?;
             if !can_proceed {
@@ -65,7 +113,7 @@ impl OmenRouter {
         let response = provider.chat_completion(&request, &context).await?;
         let latency_ms = start_time.elapsed().as_millis() as u64;
 
-        // Record usage for billing
+        // Record usage for billing and cache the response
         if let Some(ref user_id) = context.user_id {
             let input_tokens = self.estimate_input_tokens(&request);
             let output_tokens = response.usage.completion_tokens;
@@ -88,6 +136,25 @@ impl OmenRouter {
                 provider_cost,
                 input_tokens + output_tokens,
             ).await;
+
+            // Cache the response for future identical requests
+            if let Some(cache) = &self.cache {
+                let cache_key = cache.generate_response_cache_key(
+                    user_id,
+                    &request.messages,
+                    &request.model,
+                    request.temperature,
+                );
+
+                if let Err(e) = cache.cache_response(
+                    &cache_key,
+                    &response,
+                    provider.id(),
+                    provider_cost,
+                ).await {
+                    warn!("Failed to cache response: {}", e);
+                }
+            }
         }
 
         Ok(response)
@@ -394,11 +461,28 @@ impl OmenRouter {
     }
 
     fn estimate_input_tokens(&self, request: &ChatCompletionRequest) -> u32 {
-        // Rough approximation: 4 characters per token
-        let total_chars: usize = request.messages.iter()
-            .map(|m| m.content.len())
-            .sum();
-        (total_chars / 4) as u32
+        // Rough approximation: 4 characters per token for text
+        // Images add significant tokens based on resolution
+        let mut total_tokens = 0u32;
+
+        for message in &request.messages {
+            // Text content
+            total_tokens += (message.content.text().len() / 4) as u32;
+
+            // Vision tokens (images are expensive!)
+            if let Some(images) = message.content.images() {
+                for image in images {
+                    let image_tokens = match &image.detail {
+                        Some(crate::types::ImageDetail::Low) => 85,   // Low detail
+                        Some(crate::types::ImageDetail::High) => 765, // High detail
+                        _ => 425, // Auto/default
+                    };
+                    total_tokens += image_tokens;
+                }
+            }
+        }
+
+        total_tokens
     }
 
     fn estimate_provider_cost(&self, provider_id: &str, total_tokens: u32) -> f64 {
@@ -453,6 +537,7 @@ impl OmenRouter {
                 advanced_router: self.advanced_router.clone(),
                 billing_manager: self.billing_manager.clone(),
                 rate_limiter: self.rate_limiter.clone(),
+                cache: self.cache.clone(),
             }),
             self.billing_manager.clone()
         ))

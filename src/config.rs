@@ -12,6 +12,8 @@ pub struct Config {
     pub auth: AuthConfig,
     #[serde(default)]
     pub logging: LoggingConfig,
+    #[serde(default)]
+    pub cache: CacheConfig,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -169,6 +171,69 @@ fn default_log_level() -> String {
     "info".to_string()
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CacheConfig {
+    #[serde(default = "default_redis_url")]
+    pub redis_url: String,
+    #[serde(default = "default_cache_ttl")]
+    pub default_ttl_seconds: u64,
+    #[serde(default = "default_response_cache_ttl")]
+    pub response_cache_ttl: u64,
+    #[serde(default = "default_session_cache_ttl")]
+    pub session_cache_ttl: u64,
+    #[serde(default = "default_rate_limit_ttl")]
+    pub rate_limit_ttl: u64,
+    #[serde(default = "default_provider_health_ttl")]
+    pub provider_health_ttl: u64,
+    #[serde(default = "default_max_cache_size")]
+    pub max_cache_size_mb: u64,
+    #[serde(default)]
+    pub enabled: bool,
+}
+
+impl Default for CacheConfig {
+    fn default() -> Self {
+        Self {
+            redis_url: default_redis_url(),
+            default_ttl_seconds: default_cache_ttl(),
+            response_cache_ttl: default_response_cache_ttl(),
+            session_cache_ttl: default_session_cache_ttl(),
+            rate_limit_ttl: default_rate_limit_ttl(),
+            provider_health_ttl: default_provider_health_ttl(),
+            max_cache_size_mb: default_max_cache_size(),
+            enabled: false, // Disabled by default
+        }
+    }
+}
+
+fn default_redis_url() -> String {
+    "redis://localhost:6379".to_string()
+}
+
+fn default_cache_ttl() -> u64 {
+    3600 // 1 hour
+}
+
+fn default_response_cache_ttl() -> u64 {
+    1800 // 30 minutes
+}
+
+fn default_session_cache_ttl() -> u64 {
+    7200 // 2 hours
+}
+
+fn default_rate_limit_ttl() -> u64 {
+    60 // 1 minute
+}
+
+fn default_provider_health_ttl() -> u64 {
+    300 // 5 minutes
+}
+
+fn default_max_cache_size() -> u64 {
+    1024 // 1GB
+}
+
 impl Config {
     pub async fn load(path: &str) -> Result<Self> {
         use std::fs;
@@ -302,6 +367,7 @@ impl Default for Config {
             },
             auth: AuthConfig::default(),
             logging: LoggingConfig::default(),
+            cache: CacheConfig::default(),
         }
     }
 }

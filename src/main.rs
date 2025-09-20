@@ -5,6 +5,7 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 mod auth;
 mod billing;
+mod cache;
 mod config;
 mod error;
 mod ghost_ai;

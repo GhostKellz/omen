@@ -67,6 +67,8 @@ impl Server {
             .route("/rate-limit/status", get(rate_limit_status))
             .route("/ghost/chat/completions", post(ghost_chat_completions))
             .route("/ghost/session/:session_id/stats", get(ghost_session_stats))
+            .route("/cache/stats", get(cache_stats))
+            .route("/cache/clear", post(cache_clear))
             .layer(axum::middleware::from_fn_with_state(
                 Arc::clone(&self.auth_service),
                 auth::auth_middleware,
@@ -326,6 +328,57 @@ async fn ghost_session_stats(
         None => Ok(Json(serde_json::json!({
             "error": "Session not found",
             "session_id": session_id
+        })))
+    }
+}
+
+// Cache management endpoints
+async fn cache_stats(
+    State(router): State<Arc<OmenRouter>>,
+) -> Result<Json<serde_json::Value>> {
+    match &router.cache {
+        Some(cache) => {
+            match cache.get_cache_stats().await {
+                Ok(stats) => Ok(Json(serde_json::to_value(stats).unwrap())),
+                Err(e) => Ok(Json(serde_json::json!({
+                    "error": format!("Failed to get cache stats: {}", e),
+                    "cache_enabled": true
+                })))
+            }
+        }
+        None => Ok(Json(serde_json::json!({
+            "cache_enabled": false,
+            "message": "Redis cache is not enabled"
+        })))
+    }
+}
+
+#[derive(serde::Deserialize)]
+struct CacheClearRequest {
+    pattern: Option<String>,
+}
+
+async fn cache_clear(
+    State(router): State<Arc<OmenRouter>>,
+    Json(request): Json<CacheClearRequest>,
+) -> Result<Json<serde_json::Value>> {
+    match &router.cache {
+        Some(cache) => {
+            match cache.clear_cache(request.pattern.as_deref()).await {
+                Ok(deleted) => Ok(Json(serde_json::json!({
+                    "deleted_keys": deleted,
+                    "pattern": request.pattern.unwrap_or("*".to_string()),
+                    "message": format!("Cleared {} cache entries", deleted)
+                }))),
+                Err(e) => Ok(Json(serde_json::json!({
+                    "error": format!("Failed to clear cache: {}", e),
+                    "deleted_keys": 0
+                })))
+            }
+        }
+        None => Ok(Json(serde_json::json!({
+            "cache_enabled": false,
+            "message": "Redis cache is not enabled"
         })))
     }
 }

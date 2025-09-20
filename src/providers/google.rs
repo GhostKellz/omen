@@ -50,7 +50,7 @@ impl GoogleProvider {
                     if !system_instruction.is_empty() {
                         system_instruction.push('\n');
                     }
-                    system_instruction.push_str(&msg.content);
+                    system_instruction.push_str(msg.content.text());
                 }
                 "user" => {
                     gemini_contents.push(json!({
@@ -111,7 +111,7 @@ impl GoogleProvider {
                 index: 0,
                 message: ChatMessage {
                     role: "assistant".to_string(),
-                    content,
+                    content: crate::types::MessageContent::Text(content),
                     name: None,
                     tool_calls: None,
                     tool_call_id: None,

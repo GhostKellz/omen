@@ -62,6 +62,9 @@ prost-types = "0.12"
 tokio-util = "0.7"
 tokio-stream = { version = "0.1", features = ["full"] }
 
+# Redis caching
+redis = { version = "0.24", features = ["tokio-comp", "json"] }
+
 # Future QUIC support (commented out for now due to version conflicts)
 # quinn = "0.11"
 # h3 = "0.0.8"

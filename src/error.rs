@@ -23,6 +23,9 @@ pub enum OmenError {
     #[error("Unauthorized")]
     Unauthorized,
 
+    #[error("Cache error: {0}")]
+    CacheError(String),
+
     #[error("HTTP client error: {0}")]
     HttpClient(#[from] reqwest::Error),
 
