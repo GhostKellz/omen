@@ -1,0 +1,191 @@
+syntax = "proto3";
+
+package omen.v1;
+
+import "google/protobuf/struct.proto";
+
+// OMEN gRPC Service for OpenAI-compatible API
+service OmenService {
+  // Chat completion - single response
+  rpc ChatCompletion(ChatCompletionRequest) returns (ChatCompletionResponse);
+
+  // Chat completion - streaming response
+  rpc StreamChatCompletion(ChatCompletionRequest) returns (stream ChatCompletionChunk);
+
+  // List available models
+  rpc ListModels(ListModelsRequest) returns (ListModelsResponse);
+
+  // Health check
+  rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);
+
+  // Provider status
+  rpc GetProviderStatus(ProviderStatusRequest) returns (ProviderStatusResponse);
+}
+
+// Chat completion request
+message ChatCompletionRequest {
+  string model = 1;
+  repeated ChatMessage messages = 2;
+  optional double temperature = 3;
+  optional int32 max_tokens = 4;
+  optional double top_p = 5;
+  optional double frequency_penalty = 6;
+  optional double presence_penalty = 7;
+  repeated string stop = 8;
+  bool stream = 9;
+  repeated Tool tools = 10;
+  oneof tool_choice {
+    string tool_choice_auto = 11;
+    string tool_choice_none = 12;
+    ToolChoice tool_choice_function = 13;
+  }
+  map<string, string> metadata = 14;
+}
+
+// Chat message
+message ChatMessage {
+  string role = 1;
+  string content = 2;
+  optional string name = 3;
+  repeated ToolCall tool_calls = 4;
+  optional string tool_call_id = 5;
+}
+
+// Tool definition
+message Tool {
+  string type = 1;
+  Function function = 2;
+}
+
+// Function definition
+message Function {
+  string name = 1;
+  optional string description = 2;
+  map<string, google.protobuf.Value> parameters = 3;
+}
+
+// Tool choice
+message ToolChoice {
+  string type = 1;
+  Function function = 2;
+}
+
+// Tool call
+message ToolCall {
+  string id = 1;
+  string type = 2;
+  Function function = 3;
+}
+
+// Chat completion response
+message ChatCompletionResponse {
+  string id = 1;
+  string object = 2;
+  int64 created = 3;
+  string model = 4;
+  repeated ChatChoice choices = 5;
+  Usage usage = 6;
+  optional string system_fingerprint = 7;
+}
+
+// Chat choice
+message ChatChoice {
+  int32 index = 1;
+  ChatMessage message = 2;
+  optional string finish_reason = 3;
+}
+
+// Chat completion chunk (for streaming)
+message ChatCompletionChunk {
+  string id = 1;
+  string object = 2;
+  int64 created = 3;
+  string model = 4;
+  repeated ChatChoiceDelta choices = 5;
+  optional string system_fingerprint = 6;
+}
+
+// Chat choice delta (for streaming)
+message ChatChoiceDelta {
+  int32 index = 1;
+  ChatMessageDelta delta = 2;
+  optional string finish_reason = 3;
+}
+
+// Chat message delta (for streaming)
+message ChatMessageDelta {
+  optional string role = 1;
+  optional string content = 2;
+  repeated ToolCall tool_calls = 3;
+}
+
+// Usage statistics
+message Usage {
+  uint32 prompt_tokens = 1;
+  uint32 completion_tokens = 2;
+  uint32 total_tokens = 3;
+}
+
+// List models request
+message ListModelsRequest {}
+
+// List models response
+message ListModelsResponse {
+  string object = 1;
+  repeated Model data = 2;
+}
+
+// Model information
+message Model {
+  string id = 1;
+  string object = 2;
+  int64 created = 3;
+  string owned_by = 4;
+  string provider = 5;
+  uint32 context_length = 6;
+  ModelPricing pricing = 7;
+  ModelCapabilities capabilities = 8;
+}
+
+// Model pricing
+message ModelPricing {
+  double input_per_1k = 1;
+  double output_per_1k = 2;
+}
+
+// Model capabilities
+message ModelCapabilities {
+  bool vision = 1;
+  bool functions = 2;
+  bool streaming = 3;
+}
+
+// Health check request
+message HealthCheckRequest {}
+
+// Health check response
+message HealthCheckResponse {
+  string status = 1;
+  string version = 2;
+  int32 providers_available = 3;
+  map<string, bool> provider_health = 4;
+}
+
+// Provider status request
+message ProviderStatusRequest {}
+
+// Provider status response
+message ProviderStatusResponse {
+  repeated ProviderInfo providers = 1;
+}
+
+// Provider information
+message ProviderInfo {
+  string id = 1;
+  string name = 2;
+  string type = 3;
+  bool enabled = 4;
+  bool healthy = 5;
+  int32 models_count = 6;
+  optional string last_error = 7;
+}
