@@ -33,6 +33,12 @@
 
 </div>
 
+## DISCLAIMER
+
+⚠️ **EXPERIMENTAL LIBRARY - FOR LAB/PERSONAL USE** ⚠️
+
+This is an experimental library under active development. It is intended for research, learning, and personal projects. The API is subject to change!
+
 ---
 
 OpenAI-compatible API + provider adapters (Claude, GPT, Grok, Gemini, Copilot*, Ollama, Bedrock, Azure) with smart routing, streaming, tool use, usage controls, and first-class hooks for GhostLLM, Zeke.nvim, Jarvis, and GhostFlow.
