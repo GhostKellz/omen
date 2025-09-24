@@ -1,6 +1,6 @@
 <div align="center">
 
-![OMEN Logo](assets/omen-logo.png)
+<img src="assets/omen-logo.png" alt="OMEN Logo" width="180">
 
 # OMEN • Open Model Exchange Network
 
