@@ -2,6 +2,88 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use uuid::Uuid;
 
+// Embeddings request/response
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EmbeddingsRequest {
+    pub input: EmbeddingInput,
+    pub model: String,
+    #[serde(default)]
+    pub encoding_format: Option<String>,
+    #[serde(default)]
+    pub dimensions: Option<u32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum EmbeddingInput {
+    Single(String),
+    Multiple(Vec<String>),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EmbeddingsResponse {
+    pub object: String,
+    pub data: Vec<EmbeddingData>,
+    pub model: String,
+    pub usage: EmbeddingUsage,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EmbeddingData {
+    pub object: String,
+    pub embedding: Vec<f32>,
+    pub index: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EmbeddingUsage {
+    pub prompt_tokens: u32,
+    pub total_tokens: u32,
+}
+
+// Text completions (legacy endpoint)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CompletionRequest {
+    pub model: String,
+    pub prompt: CompletionPrompt,
+    #[serde(default)]
+    pub max_tokens: Option<u32>,
+    #[serde(default)]
+    pub temperature: Option<f32>,
+    #[serde(default)]
+    pub top_p: Option<f32>,
+    #[serde(default)]
+    pub n: Option<u32>,
+    #[serde(default)]
+    pub stream: bool,
+    #[serde(default)]
+    pub stop: Option<Vec<String>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum CompletionPrompt {
+    Single(String),
+    Multiple(Vec<String>),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CompletionResponse {
+    pub id: String,
+    pub object: String,
+    pub created: i64,
+    pub model: String,
+    pub choices: Vec<CompletionChoice>,
+    pub usage: Usage,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CompletionChoice {
+    pub text: String,
+    pub index: u32,
+    pub finish_reason: Option<String>,
+}
+
 // OpenAI-compatible chat completion request
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChatCompletionRequest {
@@ -280,6 +362,24 @@ pub struct ProviderHealth {
     pub name: String,
     pub healthy: bool,
     pub models_count: usize,
+    #[serde(default)]
+    pub latency_ms: Option<u64>,
+    #[serde(default)]
+    pub avg_cost_per_1k: Option<f64>,
+    #[serde(default)]
+    pub success_rate: Option<f64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProviderScore {
+    pub provider_id: String,
+    pub provider_name: String,
+    pub health_score: f64,
+    pub latency_ms: u64,
+    pub cost_score: f64,
+    pub reliability_score: f64,
+    pub overall_score: f64,
+    pub recommended: bool,
 }
 
 // OMEN-specific configuration for advanced routing strategies

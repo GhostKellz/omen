@@ -150,7 +150,7 @@ impl ProviderRegistry {
 
         // Initialize Bedrock provider
         if config.providers.bedrock.enabled {
-            if let (Some(ref region), Some(ref access_key), Some(ref secret_key)) = (
+            if let (Some(region), Some(access_key), Some(secret_key)) = (
                 &config.providers.bedrock.region,
                 &config.providers.bedrock.access_key_id,
                 &config.providers.bedrock.secret_access_key,

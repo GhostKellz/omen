@@ -1,8 +1,6 @@
 # OMEN Docker Compose Configuration
 # Complete stack with Redis for caching (optional)
 
-version: '3.8'
-
 services:
   omen:
     build: .

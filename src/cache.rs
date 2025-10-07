@@ -472,6 +472,9 @@ mod tests {
             ChatMessage {
                 role: "user".to_string(),
                 content: MessageContent::Text("Hello".to_string()),
+                name: None,
+                tool_calls: None,
+                tool_call_id: None,
             }
         ];
 

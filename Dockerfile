@@ -2,20 +2,22 @@
 # Multi-stage build for optimized production image
 
 # Build stage
-FROM rust:1.75-slim as builder
+FROM rustlang/rust:nightly-slim as builder
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
     pkg-config \
     libssl-dev \
     ca-certificates \
+    protobuf-compiler \
     && rm -rf /var/lib/apt/lists/*
 
 # Create app directory
 WORKDIR /app
 
 # Copy dependency files
-COPY Cargo.toml Cargo.lock ./
+COPY Cargo.toml Cargo.lock build.rs ./
+COPY proto ./proto
 
 # Create dummy source to cache dependencies
 RUN mkdir src && echo "fn main() {}" > src/main.rs

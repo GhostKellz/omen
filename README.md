@@ -125,6 +125,13 @@ docker compose up -d
 http(s)://<host>:8080/v1
 ```
 
+### 🩺 Operational endpoints
+
+- `GET /health` &rarr; basic liveness signal; returns the current provider inventory.
+- `GET /ready` &rarr; readiness probe; responds with HTTP 200 when at least one upstream provider is healthy, otherwise 503 for load balancers to retry.
+
+Stop the service gracefully with `Ctrl+C` (or `SIGTERM` in container orchestrators); the server drains in-flight requests before exiting.
+
 ## 🔌 Client Examples
 ### cURL
 

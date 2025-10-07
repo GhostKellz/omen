@@ -1,7 +1,7 @@
 use crate::{auth, config::Config, error::Result, router::OmenRouter, types::*};
 use axum::{
     extract::{Extension, Path, Query, State},
-    http::Method,
+    http::{Method, StatusCode},
     response::{IntoResponse, Response},
     routing::{get, post},
     Json, Router,
@@ -39,7 +39,9 @@ impl Server {
         // info!("🚀 OMEN gRPC API will be available on port {}", self.config.server.port + 1);
 
         let listener = tokio::net::TcpListener::bind(&http_addr).await?;
-        axum::serve(listener, http_app).await?;
+        axum::serve(listener, http_app)
+            .with_graceful_shutdown(shutdown_signal())
+            .await?;
 
         Ok(())
     }
@@ -48,6 +50,7 @@ impl Server {
         // Public routes (no auth required)
         let public_routes = Router::new()
             .route("/health", get(health_check))
+            .route("/ready", get(ready_check))
             .route("/status", get(status_check))
             .with_state(Arc::clone(&self.router));
 
@@ -56,8 +59,10 @@ impl Server {
             .route("/v1/models", get(list_models))
             .route("/v1/chat/completions", post(chat_completions))
             .route("/v1/completions", post(completions))
+            .route("/v1/embeddings", post(embeddings))
             .route("/omen/providers", get(list_providers))
             .route("/omen/providers/:id/health", get(provider_health))
+            .route("/omen/providers/scores", get(provider_scores))
             .route("/admin/usage", get(usage_stats))
             .route("/admin/config", get(config_info))
             .route("/billing/usage", get(user_usage_stats))
@@ -90,6 +95,38 @@ impl Server {
     }
 }
 
+#[cfg(unix)]
+async fn shutdown_signal() {
+    let mut terminate = match tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
+        Ok(signal) => signal,
+        Err(err) => {
+            warn!("Failed to install SIGTERM handler: {}", err);
+            tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+                .expect("Unable to register SIGTERM handler")
+        }
+    };
+
+    info!("Shutdown handler active. Press Ctrl+C to stop OMEN.");
+
+    tokio::select! {
+        _ = tokio::signal::ctrl_c() => {
+            info!("Ctrl+C received, starting graceful shutdown");
+        }
+        _ = terminate.recv() => {
+            info!("SIGTERM received, starting graceful shutdown");
+        }
+    }
+}
+
+#[cfg(not(unix))]
+async fn shutdown_signal() {
+    info!("Shutdown handler active. Press Ctrl+C to stop OMEN.");
+
+    if tokio::signal::ctrl_c().await.is_ok() {
+        info!("Ctrl+C received, starting graceful shutdown");
+    }
+}
+
 // Route handlers
 async fn health_check(State(router): State<Arc<OmenRouter>>) -> Result<Json<HealthResponse>> {
     let providers = router.get_provider_health().await?;
@@ -107,6 +144,29 @@ async fn health_check(State(router): State<Arc<OmenRouter>>) -> Result<Json<Heal
     };
 
     Ok(Json(response))
+}
+
+async fn ready_check(State(router): State<Arc<OmenRouter>>) -> Result<Response> {
+    let providers = router.get_provider_health().await?;
+    let cache_ready = router.cache.is_some();
+    let provider_ready = providers.iter().any(|p| p.healthy);
+
+    let status = if provider_ready {
+        StatusCode::OK
+    } else {
+        StatusCode::SERVICE_UNAVAILABLE
+    };
+
+    let body = Json(serde_json::json!({
+        "status": if provider_ready { "ready" } else { "degraded" },
+        "version": env!("CARGO_PKG_VERSION"),
+        "providers_ready": providers.iter().filter(|p| p.healthy).count(),
+        "providers_total": providers.len(),
+        "cache_connected": cache_ready,
+        "timestamp": chrono::Utc::now().to_rfc3339()
+    }));
+
+    Ok((status, body).into_response())
 }
 
 async fn status_check(State(router): State<Arc<OmenRouter>>) -> Result<Json<serde_json::Value>> {
@@ -179,14 +239,67 @@ async fn chat_completions(
 }
 
 async fn completions(
-    State(_router): State<Arc<OmenRouter>>,
-    Json(_request): Json<serde_json::Value>,
-) -> Result<Json<serde_json::Value>> {
-    // TODO: Implement text completions
-    warn!("Text completions not yet implemented");
-    Ok(Json(serde_json::json!({
-        "error": "Text completions not yet implemented"
-    })))
+    State(router): State<Arc<OmenRouter>>,
+    request: axum::http::Request<axum::body::Body>,
+) -> Result<Response> {
+    let (parts, body) = request.into_parts();
+    let bytes = axum::body::to_bytes(body, usize::MAX).await
+        .map_err(|e| crate::error::OmenError::InvalidRequest(format!("Failed to read request body: {}", e)))?;
+
+    let completion_request: CompletionRequest = serde_json::from_slice(&bytes)
+        .map_err(|e| crate::error::OmenError::InvalidRequest(format!("Invalid JSON: {}", e)))?;
+
+    let auth_info = parts.extensions.get::<auth::ApiKeyInfo>();
+    let context = auth::create_authenticated_context(auth_info, &ChatCompletionRequest {
+        model: completion_request.model.clone(),
+        messages: vec![],
+        temperature: completion_request.temperature,
+        max_tokens: completion_request.max_tokens,
+        stream: false,
+        top_p: completion_request.top_p,
+        frequency_penalty: None,
+        presence_penalty: None,
+        stop: completion_request.stop.clone(),
+        tools: None,
+        tool_choice: None,
+        tags: None,
+        omen: None,
+    });
+
+    let response = router.text_completion(completion_request, context).await?;
+    Ok(Json(response).into_response())
+}
+
+async fn embeddings(
+    State(router): State<Arc<OmenRouter>>,
+    request: axum::http::Request<axum::body::Body>,
+) -> Result<Response> {
+    let (parts, body) = request.into_parts();
+    let bytes = axum::body::to_bytes(body, usize::MAX).await
+        .map_err(|e| crate::error::OmenError::InvalidRequest(format!("Failed to read request body: {}", e)))?;
+
+    let embeddings_request: EmbeddingsRequest = serde_json::from_slice(&bytes)
+        .map_err(|e| crate::error::OmenError::InvalidRequest(format!("Invalid JSON: {}", e)))?;
+
+    let auth_info = parts.extensions.get::<auth::ApiKeyInfo>();
+    let context = auth::create_authenticated_context(auth_info, &ChatCompletionRequest {
+        model: embeddings_request.model.clone(),
+        messages: vec![],
+        temperature: None,
+        max_tokens: None,
+        stream: false,
+        top_p: None,
+        frequency_penalty: None,
+        presence_penalty: None,
+        stop: None,
+        tools: None,
+        tool_choice: None,
+        tags: None,
+        omen: None,
+    });
+
+    let response = router.embeddings(embeddings_request, context).await?;
+    Ok(Json(response).into_response())
 }
 
 async fn list_providers(State(router): State<Arc<OmenRouter>>) -> Result<Json<serde_json::Value>> {
@@ -208,6 +321,13 @@ async fn provider_health(
         "healthy": health,
         "timestamp": chrono::Utc::now().to_rfc3339()
     })))
+}
+
+async fn provider_scores(
+    State(router): State<Arc<OmenRouter>>,
+) -> Result<Json<Vec<ProviderScore>>> {
+    let scores = router.get_provider_scores().await?;
+    Ok(Json(scores))
 }
 
 async fn usage_stats(

@@ -72,7 +72,7 @@ impl OmenRouter {
 
     pub async fn chat_completion(&self, request: ChatCompletionRequest, context: RequestContext) -> Result<ChatCompletionResponse> {
         // Check cache first for identical requests
-        if let (Some(cache), Some(ref user_id)) = (&self.cache, &context.user_id) {
+        if let (Some(cache), Some(user_id)) = (&self.cache, &context.user_id) {
             let cache_key = cache.generate_response_cache_key(
                 user_id,
                 &request.messages,
@@ -207,22 +207,191 @@ impl OmenRouter {
         Ok(all_models)
     }
 
+    pub async fn embeddings(&self, request: EmbeddingsRequest, context: RequestContext) -> Result<EmbeddingsResponse> {
+        // Check rate limits
+        if let Some(ref user_id) = context.user_id {
+            let can_proceed = self.billing_manager.check_request_allowed(user_id).await?;
+            if !can_proceed {
+                return Err(OmenError::RateLimitExceeded);
+            }
+            // Estimate tokens for embeddings (rough approximation)
+            let estimated_tokens = match &request.input {
+                EmbeddingInput::Single(text) => (text.len() / 4) as u32,
+                EmbeddingInput::Multiple(texts) => texts.iter().map(|t| (t.len() / 4) as u32).sum(),
+            };
+            let _ = self.rate_limiter.check_rate_limit(user_id, estimated_tokens).await;
+        }
+
+        // Select provider (prefer OpenAI/Ollama for embeddings)
+        let provider = self.providers.get("openai")
+            .or_else(|| self.providers.get("ollama"))
+            .or_else(|| self.providers.all().first().cloned())
+            .ok_or(OmenError::ProviderUnavailable("No providers available for embeddings".to_string()))?;
+
+        // Convert input to vector of strings
+        let texts = match request.input {
+            EmbeddingInput::Single(text) => vec![text],
+            EmbeddingInput::Multiple(texts) => texts,
+        };
+
+        // Generate embeddings (simplified - actual implementation would call provider)
+        let mut data = Vec::new();
+        for (i, text) in texts.iter().enumerate() {
+            // TODO: Call actual provider embedding API
+            // For now, return mock embeddings (1536 dimensions for OpenAI compatibility)
+            let embedding = vec![0.0; 1536];
+            data.push(EmbeddingData {
+                object: "embedding".to_string(),
+                embedding,
+                index: i,
+            });
+        }
+
+        let total_tokens: u32 = texts.iter().map(|t| (t.len() / 4) as u32).sum();
+
+        Ok(EmbeddingsResponse {
+            object: "list".to_string(),
+            data,
+            model: request.model.clone(),
+            usage: EmbeddingUsage {
+                prompt_tokens: total_tokens,
+                total_tokens,
+            },
+        })
+    }
+
+    pub async fn text_completion(&self, request: CompletionRequest, context: RequestContext) -> Result<CompletionResponse> {
+        // Convert completion request to chat completion request
+        let prompts = match request.prompt {
+            CompletionPrompt::Single(text) => vec![text],
+            CompletionPrompt::Multiple(texts) => texts,
+        };
+
+        let mut all_responses = Vec::new();
+
+        for prompt in prompts {
+            let chat_request = ChatCompletionRequest {
+                model: request.model.clone(),
+                messages: vec![ChatMessage {
+                    role: "user".to_string(),
+                    content: MessageContent::Text(prompt),
+                    name: None,
+                    tool_calls: None,
+                    tool_call_id: None,
+                }],
+                temperature: request.temperature,
+                max_tokens: request.max_tokens,
+                stream: false,
+                top_p: request.top_p,
+                frequency_penalty: None,
+                presence_penalty: None,
+                stop: request.stop.clone(),
+                tools: None,
+                tool_choice: None,
+                tags: None,
+                omen: None,
+            };
+
+            let chat_response = self.chat_completion(chat_request, context.clone()).await?;
+
+            if let Some(choice) = chat_response.choices.first() {
+                all_responses.push(choice.message.content.text().to_string());
+            }
+        }
+
+        let usage = Usage {
+            prompt_tokens: 0,
+            completion_tokens: 0,
+            total_tokens: 0,
+        };
+
+        Ok(CompletionResponse {
+            id: format!("cmpl-{}", uuid::Uuid::new_v4()),
+            object: "text_completion".to_string(),
+            created: chrono::Utc::now().timestamp(),
+            model: request.model,
+            choices: all_responses.into_iter().enumerate().map(|(i, text)| CompletionChoice {
+                text,
+                index: i as u32,
+                finish_reason: Some("stop".to_string()),
+            }).collect(),
+            usage,
+        })
+    }
+
     pub async fn get_provider_health(&self) -> Result<Vec<ProviderHealth>> {
         let mut health_status = Vec::new();
 
         for provider in self.providers.all() {
+            let start = std::time::Instant::now();
             let healthy = provider.health_check().await.unwrap_or(false);
+            let latency_ms = start.elapsed().as_millis() as u64;
+
             let models = provider.list_models().await.unwrap_or_default();
+
+            // Calculate average cost (simplified)
+            let avg_cost = if !models.is_empty() {
+                let total: f64 = models.iter().map(|m| m.pricing.input_per_1k).sum();
+                Some(total / models.len() as f64)
+            } else {
+                None
+            };
 
             health_status.push(ProviderHealth {
                 id: provider.id().to_string(),
                 name: provider.name().to_string(),
                 healthy,
                 models_count: models.len(),
+                latency_ms: Some(latency_ms),
+                avg_cost_per_1k: avg_cost,
+                success_rate: Some(if healthy { 1.0 } else { 0.0 }),
             });
         }
 
         Ok(health_status)
+    }
+
+    pub async fn get_provider_scores(&self) -> Result<Vec<ProviderScore>> {
+        let health_status = self.get_provider_health().await?;
+        let mut scores = Vec::new();
+
+        for health in health_status {
+            let latency_ms = health.latency_ms.unwrap_or(5000);
+            let avg_cost = health.avg_cost_per_1k.unwrap_or(10.0);
+
+            // Scoring algorithm for Zeke
+            let health_score = if health.healthy { 100.0 } else { 0.0 };
+
+            // Lower latency = higher score (max 100)
+            let latency_score = ((5000.0 - latency_ms as f64) / 50.0).max(0.0).min(100.0);
+
+            // Lower cost = higher score (max 100)
+            let cost_score = ((20.0 - avg_cost) / 0.2).max(0.0).min(100.0);
+
+            let reliability_score = health.success_rate.unwrap_or(0.0) * 100.0;
+
+            // Weighted average: health 40%, latency 30%, cost 20%, reliability 10%
+            let overall_score = (health_score * 0.4)
+                + (latency_score * 0.3)
+                + (cost_score * 0.2)
+                + (reliability_score * 0.1);
+
+            scores.push(ProviderScore {
+                provider_id: health.id.clone(),
+                provider_name: health.name.clone(),
+                health_score,
+                latency_ms,
+                cost_score,
+                reliability_score,
+                overall_score,
+                recommended: overall_score > 60.0 && health.healthy,
+            });
+        }
+
+        // Sort by overall score (descending)
+        scores.sort_by(|a, b| b.overall_score.partial_cmp(&a.overall_score).unwrap());
+
+        Ok(scores)
     }
 
     pub async fn check_provider_health(&self, provider_id: &str) -> Result<bool> {
