@@ -639,14 +639,16 @@ impl OmenRouter {
             total_tokens += (message.content.text().len() / 4) as u32;
 
             // Vision tokens (images are expensive!)
-            if let Some(images) = message.content.images() {
-                for image in images {
-                    let image_tokens = match &image.detail {
-                        Some(crate::types::ImageDetail::Low) => 85,   // Low detail
-                        Some(crate::types::ImageDetail::High) => 765, // High detail
-                        _ => 425, // Auto/default
-                    };
-                    total_tokens += image_tokens;
+            if let MessageContent::Parts(parts) = &message.content {
+                for part in parts {
+                    if let ContentPart::ImageUrl { image_url } = part {
+                        let image_tokens = match image_url.detail.as_deref() {
+                            Some("low") => 85,   // Low detail
+                            Some("high") => 765, // High detail
+                            _ => 425, // Auto/default
+                        };
+                        total_tokens += image_tokens;
+                    }
                 }
             }
         }

@@ -424,9 +424,15 @@ impl RedisCache {
             msg.role.hash(&mut hasher);
             match &msg.content {
                 MessageContent::Text(text) => text.hash(&mut hasher),
-                MessageContent::MultiModal { text, images } => {
-                    text.hash(&mut hasher);
-                    images.len().hash(&mut hasher); // Hash image count, not content
+                MessageContent::Parts(parts) => {
+                    for part in parts {
+                        match part {
+                            ContentPart::Text { text } => text.hash(&mut hasher),
+                            ContentPart::ImageUrl { image_url } => {
+                                image_url.url.hash(&mut hasher);
+                            }
+                        }
+                    }
                 }
             }
         }

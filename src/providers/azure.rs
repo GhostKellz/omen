@@ -25,6 +25,20 @@ impl AzureProvider {
         api_version: Option<String>,
         timeout_seconds: u64,
     ) -> Result<Self> {
+        // Validate endpoint is not empty
+        if endpoint.is_empty() {
+            return Err(OmenError::Provider("Azure endpoint cannot be empty".to_string()));
+        }
+
+        // Ensure endpoint is a valid URL
+        let trimmed_endpoint = endpoint.trim().trim_end_matches('/').to_string();
+        if !trimmed_endpoint.starts_with("http://") && !trimmed_endpoint.starts_with("https://") {
+            return Err(OmenError::Provider(format!(
+                "Azure endpoint must start with http:// or https://, got: {}",
+                trimmed_endpoint
+            )));
+        }
+
         let client = Client::builder()
             .timeout(Duration::from_secs(timeout_seconds))
             .build()?;
@@ -33,12 +47,12 @@ impl AzureProvider {
 
         let provider = Self {
             client,
-            endpoint: endpoint.trim_end_matches('/').to_string(),
+            endpoint: trimmed_endpoint,
             api_key,
             api_version,
         };
 
-        debug!("✅ Azure OpenAI provider initialized");
+        debug!("✅ Azure OpenAI provider initialized with endpoint: {}", provider.endpoint);
 
         Ok(provider)
     }

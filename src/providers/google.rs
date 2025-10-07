@@ -50,7 +50,7 @@ impl GoogleProvider {
                     if !system_instruction.is_empty() {
                         system_instruction.push('\n');
                     }
-                    system_instruction.push_str(msg.content.text());
+                    system_instruction.push_str(&msg.content.text());
                 }
                 "user" => {
                     gemini_contents.push(json!({
@@ -257,10 +257,10 @@ impl Provider for GoogleProvider {
 
         debug!("Sending request to Google Gemini: {}", context.request_id);
 
-        let model_name = request.model.replace("gemini-", "gemini-1.5-");
+        // Use model name as-is (already in correct format from model listing)
         let response = self
             .client
-            .post(&format!("{}/v1beta/models/{}:generateContent", self.base_url, model_name))
+            .post(&format!("{}/v1beta/models/{}:generateContent", self.base_url, request.model))
             .header("Content-Type", "application/json")
             .query(&[("key", &self.api_key)])
             .json(&payload)
@@ -315,10 +315,10 @@ impl Provider for GoogleProvider {
 
         debug!("Sending streaming request to Google Gemini: {}", context.request_id);
 
-        let model_name = request.model.replace("gemini-", "gemini-1.5-");
+        // Use model name as-is (already in correct format from model listing)
         let response = self
             .client
-            .post(&format!("{}/v1beta/models/{}:streamGenerateContent", self.base_url, model_name))
+            .post(&format!("{}/v1beta/models/{}:streamGenerateContent", self.base_url, request.model))
             .header("Content-Type", "application/json")
             .query(&[("key", &self.api_key)])
             .json(&payload)

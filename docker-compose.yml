@@ -7,6 +7,8 @@ services:
     image: omen:latest
     container_name: omen
     restart: unless-stopped
+    env_file:
+      - .env
     environment:
       # Server config
       OMEN_BIND: "0.0.0.0"
@@ -17,15 +19,15 @@ services:
       OMEN_REDIS_URL: "redis://redis:6379"
 
       # Provider API keys (set these in .env file)
-      # OMEN_OPENAI_API_KEY: "${OMEN_OPENAI_API_KEY}"
-      # OMEN_ANTHROPIC_API_KEY: "${OMEN_ANTHROPIC_API_KEY}"
-      # OMEN_GOOGLE_API_KEY: "${OMEN_GOOGLE_API_KEY}"
-      # OMEN_XAI_API_KEY: "${OMEN_XAI_API_KEY}"
-      # OMEN_AZURE_OPENAI_ENDPOINT: "${OMEN_AZURE_OPENAI_ENDPOINT}"
-      # OMEN_AZURE_OPENAI_API_KEY: "${OMEN_AZURE_OPENAI_API_KEY}"
+      OMEN_OPENAI_API_KEY: "${OMEN_OPENAI_API_KEY}"
+      OMEN_ANTHROPIC_API_KEY: "${OMEN_ANTHROPIC_API_KEY:-}"
+      OMEN_GOOGLE_API_KEY: "${OMEN_GOOGLE_API_KEY:-}"
+      OMEN_XAI_API_KEY: "${OMEN_XAI_API_KEY:-}"
+      OMEN_AZURE_OPENAI_ENDPOINT: "${OMEN_AZURE_OPENAI_ENDPOINT:-}"
+      OMEN_AZURE_OPENAI_API_KEY: "${OMEN_AZURE_OPENAI_API_KEY:-}"
 
-      # Ollama endpoints
-      OMEN_OLLAMA_ENDPOINTS: "http://ollama:11434"
+      # Ollama endpoints - using existing localhost Ollama (PRODUCTION)
+      OMEN_OLLAMA_ENDPOINTS: "${OMEN_OLLAMA_ENDPOINTS}"
 
       # Routing
       OMEN_ROUTER_PREFER_LOCAL_FOR: "code,regex,tests"
@@ -39,6 +41,8 @@ services:
       - redis
     networks:
       - omen-network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"  # Allows OMEN to reach localhost:11434
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 30s
@@ -61,28 +65,28 @@ services:
       timeout: 10s
       retries: 3
 
-  # Optional: Local Ollama instance
-  ollama:
-    image: ollama/ollama:latest
-    container_name: omen-ollama
-    restart: unless-stopped
-    ports:
-      - "11434:11434"
-    volumes:
-      - ollama_data:/root/.ollama
-    networks:
-      - omen-network
-    environment:
-      - OLLAMA_HOST=0.0.0.0
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
-    profiles:
-      - local-ai  # Use 'docker-compose --profile local-ai up' to include
+  # NOTE: Ollama disabled - using existing production Ollama on localhost:11434
+  # ollama:
+  #   image: ollama/ollama:latest
+  #   container_name: omen-ollama
+  #   restart: unless-stopped
+  #   ports:
+  #     - "11434:11434"
+  #   volumes:
+  #     - ollama_data:/root/.ollama
+  #   networks:
+  #     - omen-network
+  #   environment:
+  #     - OLLAMA_HOST=0.0.0.0
+  #   deploy:
+  #     resources:
+  #       reservations:
+  #         devices:
+  #           - driver: nvidia
+  #             count: 1
+  #             capabilities: [gpu]
+  #   profiles:
+  #     - local-ai  # Use 'docker-compose --profile local-ai up' to include
 
 volumes:
   omen_data:

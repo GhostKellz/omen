@@ -394,14 +394,16 @@ impl GhostOrchestrator {
             total_tokens += (message.content.text().len() / 4) as u32;
 
             // Vision tokens for multimodal content
-            if let Some(images) = message.content.images() {
-                for image in images {
-                    let image_tokens = match &image.detail {
-                        Some(crate::types::ImageDetail::Low) => 85,
-                        Some(crate::types::ImageDetail::High) => 765,
-                        _ => 425,
-                    };
-                    total_tokens += image_tokens;
+            if let MessageContent::Parts(parts) = &message.content {
+                for part in parts {
+                    if let ContentPart::ImageUrl { image_url } = part {
+                        let image_tokens = match image_url.detail.as_deref() {
+                            Some("low") => 85,
+                            Some("high") => 765,
+                            _ => 425,
+                        };
+                        total_tokens += image_tokens;
+                    }
                 }
             }
         }

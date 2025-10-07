@@ -69,9 +69,25 @@ impl Provider for OpenAIProvider {
             .await;
 
         match response {
-            Ok(resp) => Ok(resp.status().is_success()),
+            Ok(resp) => {
+                let status = resp.status();
+                if status.is_success() {
+                    debug!("✅ OpenAI health check passed");
+                    Ok(true)
+                } else {
+                    // Log detailed error for debugging
+                    let error_body = resp.text().await.unwrap_or_else(|_| "Unable to read response".to_string());
+                    warn!(
+                        "OpenAI health check failed with status {}: {}",
+                        status, error_body
+                    );
+                    // Don't fail completely - provider might still work for completions
+                    Ok(false)
+                }
+            }
             Err(e) => {
-                debug!("OpenAI health check failed: {}", e);
+                warn!("OpenAI health check network error: {}", e);
+                // Network errors don't mean the API key is invalid
                 Ok(false)
             }
         }

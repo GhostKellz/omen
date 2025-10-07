@@ -117,7 +117,6 @@ pub struct ChatCompletionRequest {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChatMessage {
     pub role: String,
-    #[serde(flatten)]
     pub content: MessageContent,
     #[serde(default)]
     pub name: Option<String>,
@@ -130,25 +129,52 @@ pub struct ChatMessage {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum MessageContent {
+    // Simple text string (most common)
     Text(String),
-    MultiModal {
+    // Array of content parts (OpenAI multimodal format)
+    Parts(Vec<ContentPart>),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum ContentPart {
+    Text {
         text: String,
-        images: Vec<ImageContent>,
+    },
+    ImageUrl {
+        image_url: ImageUrl,
     },
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ImageUrl {
+    pub url: String,
+    #[serde(default)]
+    pub detail: Option<String>,
+}
+
 impl MessageContent {
-    pub fn text(&self) -> &str {
+    pub fn text(&self) -> String {
         match self {
-            MessageContent::Text(text) => text,
-            MessageContent::MultiModal { text, .. } => text,
+            MessageContent::Text(text) => text.clone(),
+            MessageContent::Parts(parts) => {
+                parts.iter()
+                    .filter_map(|part| match part {
+                        ContentPart::Text { text } => Some(text.as_str()),
+                        _ => None,
+                    })
+                    .collect::<Vec<_>>()
+                    .join(" ")
+            }
         }
     }
 
-    pub fn images(&self) -> Option<&[ImageContent]> {
+    pub fn has_images(&self) -> bool {
         match self {
-            MessageContent::Text(_) => None,
-            MessageContent::MultiModal { images, .. } => Some(images),
+            MessageContent::Text(_) => false,
+            MessageContent::Parts(parts) => {
+                parts.iter().any(|part| matches!(part, ContentPart::ImageUrl { .. }))
+            }
         }
     }
 
@@ -157,7 +183,7 @@ impl MessageContent {
     }
 
     pub fn is_multimodal(&self) -> bool {
-        matches!(self, MessageContent::MultiModal { .. })
+        self.has_images()
     }
 
     pub fn to_lowercase(&self) -> String {
@@ -169,10 +195,20 @@ impl std::fmt::Display for MessageContent {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             MessageContent::Text(text) => write!(f, "{}", text),
-            MessageContent::MultiModal { text, images } => {
-                write!(f, "{}", text)?;
-                if !images.is_empty() {
-                    write!(f, " [+{} image(s)]", images.len())?;
+            MessageContent::Parts(parts) => {
+                let text_parts: Vec<&str> = parts.iter()
+                    .filter_map(|part| match part {
+                        ContentPart::Text { text } => Some(text.as_str()),
+                        _ => None,
+                    })
+                    .collect();
+                write!(f, "{}", text_parts.join(" "))?;
+
+                let image_count = parts.iter()
+                    .filter(|part| matches!(part, ContentPart::ImageUrl { .. }))
+                    .count();
+                if image_count > 0 {
+                    write!(f, " [+{} image(s)]", image_count)?;
                 }
                 Ok(())
             }
