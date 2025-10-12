@@ -13,7 +13,6 @@ use tower_http::{
     trace::TraceLayer,
 };
 use tracing::{info, warn};
-use uuid::Uuid;
 
 pub struct Server {
     config: Config,
@@ -426,9 +425,10 @@ async fn rate_limit_status(
 // Ghost AI endpoints
 async fn ghost_chat_completions(
     State(router): State<Arc<OmenRouter>>,
-    Extension(auth_info): Extension<crate::auth::ApiKeyInfo>,
+    Extension(_auth_info): Extension<crate::auth::ApiKeyInfo>,
     Json(request): Json<crate::ghost_ai::GhostRequest>,
 ) -> Result<Json<crate::ghost_ai::GhostResponse>> {
+    // TODO: Use _auth_info for Ghost AI request authorization
     let response = router.process_ghost_request(request).await?;
     Ok(Json(response))
 }

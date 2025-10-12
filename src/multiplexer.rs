@@ -4,11 +4,11 @@ use crate::{
     types::*,
 };
 use futures::{stream::Stream, StreamExt};
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{sync::Arc, time::Duration};
 use tokio::{
     select,
-    sync::{mpsc, oneshot},
-    time::{timeout, Instant},
+    sync::mpsc,
+    time::Instant,
 };
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, info, warn};
@@ -46,6 +46,8 @@ impl From<&OmenConfig> for MultiplexStrategy {
     }
 }
 
+/// Stream event types for multiplexing - all variants are part of the public API
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub enum StreamEvent {
     Token {
@@ -69,6 +71,7 @@ pub enum StreamEvent {
     },
 }
 
+#[allow(dead_code)]
 pub struct StreamMultiplexer {
     providers: Vec<Arc<dyn Provider>>,
     budget_cap: f64,
@@ -190,7 +193,7 @@ impl StreamMultiplexer {
 
         // Start all providers concurrently
         for provider in candidates {
-            let provider_id = provider.id().to_string();
+            let _provider_id = provider.id().to_string();
             let req_clone = request.clone();
             let ctx_clone = context.clone();
             let tx_clone = tx.clone();
@@ -296,7 +299,7 @@ impl StreamMultiplexer {
 
         // Start local provider immediately
         for provider in local_providers {
-            let provider_id = provider.id().to_string();
+            let _provider_id = provider.id().to_string();
             let req_clone = request.clone();
             let ctx_clone = context.clone();
             let tx_clone = tx.clone();
@@ -322,7 +325,7 @@ impl StreamMultiplexer {
             tokio::time::sleep(Duration::from_millis(delay_ms)).await;
 
             for provider in cloud_providers {
-                let provider_id = provider.id().to_string();
+                let _provider_id = provider.id().to_string();
                 let req_clone = request.clone();
                 let ctx_clone = context.clone();
                 let tx_clone = cloud_tx.clone();

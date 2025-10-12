@@ -7,6 +7,14 @@ license = "MIT"
 repository = "https://github.com/ghostkellz/omen"
 authors = ["CK Technology <contact@cktechx.com>"]
 
+[lib]
+name = "omen"
+path = "src/lib.rs"
+
+[[bin]]
+name = "omen"
+path = "src/main.rs"
+
 [dependencies]
 # Web framework
 axum = { version = "0.7", features = ["tokio", "json", "tower-log", "ws"] }

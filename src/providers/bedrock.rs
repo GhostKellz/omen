@@ -11,6 +11,7 @@ use std::time::Duration;
 use tracing::{debug, error};
 
 #[derive(Debug)]
+#[allow(dead_code)]
 pub struct BedrockProvider {
     client: Client,
     region: String,

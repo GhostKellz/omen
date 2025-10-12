@@ -1,6 +1,5 @@
 use crate::{
     config::Config,
-    error::{OmenError, Result},
     types::RequestContext,
 };
 use axum::{
@@ -12,11 +11,14 @@ use axum::{
 use std::{collections::HashMap, sync::Arc};
 use tracing::{debug, warn};
 
+/// Authentication service for OMEN - all methods are part of the public API
+#[allow(dead_code)]
 pub struct AuthService {
     config: Arc<Config>,
     api_keys: HashMap<String, ApiKeyInfo>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct ApiKeyInfo {
     pub user_id: String,
@@ -29,6 +31,7 @@ pub struct ApiKeyInfo {
     pub last_used: Option<chrono::DateTime<chrono::Utc>>,
 }
 
+#[allow(dead_code)]
 impl AuthService {
     pub fn new(config: Arc<Config>) -> Self {
         let mut api_keys = HashMap::new();
@@ -140,7 +143,8 @@ pub async fn auth_middleware(
     }
 }
 
-// Helper to extract auth info from request extensions
+// Helper to extract auth info from request extensions - part of public API
+#[allow(dead_code)]
 pub fn get_auth_info(request: &Request) -> Option<&ApiKeyInfo> {
     request.extensions().get::<ApiKeyInfo>()
 }
@@ -208,7 +212,8 @@ fn classify_request_intent(request: &crate::types::ChatCompletionRequest) -> Opt
     Some("general".to_string())
 }
 
-// Rate limiting structures
+// Rate limiting structures - part of public API
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct RateLimit {
     pub requests_per_hour: u32,
@@ -236,6 +241,8 @@ impl Default for UsageTracker {
     }
 }
 
+/// UsageTracker implementation - all public methods are part of the API
+#[allow(dead_code)]
 impl UsageTracker {
     pub fn should_reset_daily(&self) -> bool {
         let now = chrono::Utc::now();

@@ -9,8 +9,7 @@ mod cache;
 mod config;
 mod error;
 mod ghost_ai;
-// TODO: Re-enable after fixing compilation issues
-// mod grpc;
+mod grpc;
 mod multiplexer;
 mod providers;
 mod rate_limiter;

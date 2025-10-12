@@ -1,11 +1,11 @@
 use crate::{
-    error::{OmenError, Result},
+    error::Result,
     providers::Provider,
     types::*,
 };
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, sync::Arc, time::Duration};
-use tracing::{debug, info, warn};
+use std::{collections::HashMap, sync::Arc};
+use tracing::{debug, info};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RoutingStrategy {
@@ -52,6 +52,7 @@ impl Default for ProviderMetrics {
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct RoutingDecision {
     pub selected_providers: Vec<String>,
     pub strategy_used: String,
@@ -69,6 +70,8 @@ pub struct AdvancedRouter {
     latency_targets: HashMap<String, u64>, // per-intent SLA targets
 }
 
+/// AdvancedRouter implementation - all public methods are part of the routing API
+#[allow(dead_code)]
 impl AdvancedRouter {
     pub fn new() -> Self {
         let mut latency_targets = HashMap::new();

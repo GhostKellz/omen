@@ -167,15 +167,16 @@ impl Provider for GoogleProvider {
     }
 
     async fn list_models(&self) -> Result<Vec<Model>> {
-        // Google doesn't have a public models endpoint, so we'll return known models
+        // Return current Gemini models (as of 2025)
+        // Google has Gemini 2.5 and 2.0 models now
         Ok(vec![
             Model {
-                id: "gemini-1.5-pro".to_string(),
+                id: "gemini-2.5-pro".to_string(),
                 object: "model".to_string(),
                 created: chrono::Utc::now().timestamp(),
                 owned_by: "google".to_string(),
                 provider: "google".to_string(),
-                context_length: 2000000, // 2M tokens
+                context_length: 2097152, // 2M tokens
                 pricing: ModelPricing {
                     input_per_1k: 0.00125,
                     output_per_1k: 0.005,
@@ -187,12 +188,12 @@ impl Provider for GoogleProvider {
                 },
             },
             Model {
-                id: "gemini-1.5-flash".to_string(),
+                id: "gemini-2.5-flash".to_string(),
                 object: "model".to_string(),
                 created: chrono::Utc::now().timestamp(),
                 owned_by: "google".to_string(),
                 provider: "google".to_string(),
-                context_length: 1000000, // 1M tokens
+                context_length: 1048576, // 1M tokens
                 pricing: ModelPricing {
                     input_per_1k: 0.000075,
                     output_per_1k: 0.0003,
@@ -204,18 +205,18 @@ impl Provider for GoogleProvider {
                 },
             },
             Model {
-                id: "gemini-pro".to_string(),
+                id: "gemini-2.0-flash".to_string(),
                 object: "model".to_string(),
                 created: chrono::Utc::now().timestamp(),
                 owned_by: "google".to_string(),
                 provider: "google".to_string(),
-                context_length: 32768,
+                context_length: 1048576, // 1M tokens
                 pricing: ModelPricing {
-                    input_per_1k: 0.0005,
-                    output_per_1k: 0.0015,
+                    input_per_1k: 0.0000375,
+                    output_per_1k: 0.00015,
                 },
                 capabilities: ModelCapabilities {
-                    vision: false,
+                    vision: true,
                     functions: true,
                     streaming: true,
                 },

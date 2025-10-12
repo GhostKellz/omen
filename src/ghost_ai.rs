@@ -1,6 +1,6 @@
 use crate::{
     billing::BillingManager,
-    error::{OmenError, Result},
+    error::Result,
     rate_limiter::GhostAIRateLimiter,
     router::OmenRouter,
     types::*,
@@ -8,7 +8,7 @@ use crate::{
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, sync::Arc};
 use tokio::sync::RwLock;
-use tracing::{debug, info, warn};
+use tracing::info;
 use uuid::Uuid;
 
 /// Ghost AI ecosystem service definitions
@@ -71,16 +71,19 @@ impl GhostContext {
         }
     }
 
+    #[allow(dead_code)]
     pub fn with_workflow(mut self, workflow_id: Uuid) -> Self {
         self.workflow_id = Some(workflow_id);
         self
     }
 
+    #[allow(dead_code)]
     pub fn with_chain(mut self, chain_id: Uuid) -> Self {
         self.chain_id = Some(chain_id);
         self
     }
 
+    #[allow(dead_code)]
     pub fn with_metadata(mut self, key: String, value: String) -> Self {
         self.metadata.insert(key, value);
         self
@@ -153,12 +156,14 @@ struct GhostSession {
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 struct GhostServiceConfig {
     default_routing_hints: GhostRoutingHints,
     fallback_strategy: GhostFallbackStrategy,
     session_timeout_minutes: u32,
 }
 
+#[allow(dead_code)]
 impl GhostOrchestrator {
     pub fn new(router: Arc<OmenRouter>, billing_manager: Arc<BillingManager>) -> Self {
         let rate_limiter = Arc::new(GhostAIRateLimiter::new(billing_manager));
@@ -469,6 +474,7 @@ pub struct GhostSessionStats {
 
 // Helper functions for Ghost AI ecosystem integration
 impl GhostOrchestrator {
+#[allow(dead_code)]
     /// Create a GhostLLM optimized request
     pub fn create_ghostllm_request(user_id: String, messages: Vec<ChatMessage>) -> GhostRequest {
         let context = GhostContext::new(GhostService::GhostLLM, user_id);
@@ -504,6 +510,7 @@ impl GhostOrchestrator {
     }
 
     /// Create a GhostFlow automation request
+    #[allow(dead_code)]
     pub fn create_ghostflow_request(
         user_id: String,
         workflow_id: Uuid,

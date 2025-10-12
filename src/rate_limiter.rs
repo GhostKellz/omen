@@ -216,6 +216,7 @@ pub struct GhostAIRateLimiter {
     service_priorities: HashMap<String, u8>, // 0-255, higher = more priority
 }
 
+#[allow(dead_code)]
 impl GhostAIRateLimiter {
     pub fn new(billing_manager: Arc<BillingManager>) -> Self {
         let adaptive_limiter = AdaptiveRateLimiter::new(billing_manager);
@@ -261,7 +262,7 @@ impl GhostAIRateLimiter {
         priority: u8
     ) -> Result<()> {
         // Enhanced limits for Ghost AI services based on priority
-        let multiplier = match priority {
+        let _multiplier = match priority {
             255 => 5.0,  // GhostLLM gets 5x normal limits
             200 => 3.0,  // GhostFlow gets 3x normal limits
             180 => 2.5,  // Zeke gets 2.5x normal limits
@@ -269,7 +270,7 @@ impl GhostAIRateLimiter {
             _ => 1.0,    // Standard limits
         };
 
-        // TODO: Implement enhanced rate limiting logic
+        // TODO: Implement enhanced rate limiting logic (use _multiplier)
         // For now, just use standard rate limiting
         self.adaptive_limiter.check_rate_limit(user_id, estimated_tokens).await
     }

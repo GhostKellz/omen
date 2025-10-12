@@ -16,7 +16,8 @@ Each layer serves a distinct role — from local performance to multi-provider A
                     │──────────────────────────│
                     │  Grim (Editor Core)       │
                     │   ├─ Phantom.grim (Config)│
-                    │   ├─ Zeke.grim (AI Plugin)│
+                    │   ├─ Zeke.grim (AI Plugin)
+                        |- reaper.grim (AI Plugin)│
                     │   └─ GhostLS / Grove      │
                     │                          │
                     │  Zeke (CLI / Local AI)    │

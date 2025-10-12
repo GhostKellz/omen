@@ -1,13 +1,12 @@
 use crate::{
     auth::UsageTracker,
     error::{OmenError, Result},
-    types::*,
 };
 use chrono::{DateTime, Datelike, Utc};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, sync::Arc};
 use tokio::sync::RwLock;
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BillingTier {
@@ -45,6 +44,8 @@ pub struct UserBilling {
     pub billing_email: Option<String>,
 }
 
+/// UserBilling implementation - all public methods are part of the API
+#[allow(dead_code)]
 impl UserBilling {
     pub fn new(user_id: String, tier: BillingTier) -> Self {
         let now = Utc::now();
@@ -119,6 +120,7 @@ impl UserBilling {
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct TokenUsage {
     pub input_tokens: u32,
     pub output_tokens: u32,
@@ -139,6 +141,8 @@ impl TokenUsage {
     }
 }
 
+/// Billing manager - all public methods are part of the API
+#[allow(dead_code)]
 #[derive(Debug)]
 pub struct BillingManager {
     user_billing: Arc<RwLock<HashMap<String, UserBilling>>>,
@@ -146,6 +150,7 @@ pub struct BillingManager {
     usage_history: Arc<RwLock<HashMap<String, Vec<TokenUsage>>>>,
 }
 
+#[allow(dead_code)]
 impl BillingManager {
     pub fn new() -> Self {
         let mut tier_configs = HashMap::new();

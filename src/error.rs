@@ -1,5 +1,7 @@
 use thiserror::Error;
 
+/// OMEN error types - all variants are part of the public API
+#[allow(dead_code)]
 #[derive(Error, Debug)]
 pub enum OmenError {
     #[error("Configuration error: {0}")]
@@ -40,6 +42,9 @@ pub enum OmenError {
 
     #[error("TOML parsing error: {0}")]
     Toml(#[from] toml::de::Error),
+
+    #[error("Server error: {0}")]
+    Server(String),
 }
 
 pub type Result<T> = std::result::Result<T, OmenError>;

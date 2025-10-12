@@ -1,10 +1,9 @@
 use crate::{
     error::{OmenError, Result},
     router::OmenRouter,
-    types::*,
 };
 use std::sync::Arc;
-use tonic::{Request, Response, Status, Streaming};
+use tonic::{Request, Response, Status};
 use tracing::{debug, error, info};
 use uuid::Uuid;
 
@@ -15,17 +14,17 @@ pub mod proto {
 
 use proto::{
     omen_service_server::{OmenService, OmenServiceServer},
-    ChatCompletionRequest as GrpcChatCompletionRequest,
-    ChatCompletionResponse as GrpcChatCompletionResponse,
-    ChatCompletionChunk as GrpcChatCompletionChunk,
+    ChatCompletionRequest as ProtoChatCompletionRequest,
+    ChatCompletionResponse as ProtoChatCompletionResponse,
+    ChatCompletionChunk as ProtoChatCompletionChunk,
     ListModelsRequest, ListModelsResponse,
     HealthCheckRequest, HealthCheckResponse,
     ProviderStatusRequest, ProviderStatusResponse,
-    Model as GrpcModel, ProviderInfo,
-    ChatMessage as GrpcChatMessage, ChatChoice as GrpcChatChoice,
-    ChatChoiceDelta as GrpcChatChoiceDelta, ChatMessageDelta as GrpcChatMessageDelta,
-    Usage as GrpcUsage, ModelPricing as GrpcModelPricing, ModelCapabilities as GrpcModelCapabilities,
-    ToolCall as GrpcToolCall, Function as GrpcFunction,
+    Model as ProtoModel, ProviderInfo,
+    ChatMessage as ProtoChatMessage, ChatChoice as ProtoChatChoice,
+    ChatChoiceDelta as ProtoChatChoiceDelta, ChatMessageDelta as ProtoChatMessageDelta,
+    Usage as ProtoUsage, ModelPricing as ProtoModelPricing, ModelCapabilities as ProtoModelCapabilities,
+    ToolCall as ProtoToolCall, Function as ProtoFunction,
 };
 
 pub struct OmenGrpcService {
@@ -46,8 +45,8 @@ impl OmenGrpcService {
 impl OmenService for OmenGrpcService {
     async fn chat_completion(
         &self,
-        request: Request<ChatCompletionRequest>,
-    ) -> std::result::Result<Response<ChatCompletionResponse>, Status> {
+        request: Request<ProtoChatCompletionRequest>,
+    ) -> std::result::Result<Response<ProtoChatCompletionResponse>, Status> {
         let req = request.into_inner();
         debug!("gRPC chat completion request for model: {}", req.model);
 
@@ -69,12 +68,12 @@ impl OmenService for OmenGrpcService {
     }
 
     type StreamChatCompletionStream = tokio_stream::wrappers::ReceiverStream<
-        std::result::Result<ChatCompletionChunk, Status>,
+        std::result::Result<ProtoChatCompletionChunk, Status>,
     >;
 
     async fn stream_chat_completion(
         &self,
-        request: Request<ChatCompletionRequest>,
+        request: Request<ProtoChatCompletionRequest>,
     ) -> std::result::Result<Response<Self::StreamChatCompletionStream>, Status> {
         let req = request.into_inner();
         debug!("gRPC streaming chat completion request for model: {}", req.model);
@@ -215,55 +214,65 @@ impl OmenService for OmenGrpcService {
 
 // Helper functions for conversion
 
-fn convert_grpc_to_chat_request(req: ChatCompletionRequest) -> std::result::Result<crate::types::ChatCompletionRequest, Status> {
+fn convert_grpc_to_chat_request(req: ProtoChatCompletionRequest) -> std::result::Result<crate::types::ChatCompletionRequest, Status> {
     let messages = req.messages
         .into_iter()
-        .map(|msg| crate::types::ChatMessage {
-            role: msg.role,
-            content: msg.content,
-            name: msg.name,
-            tool_calls: msg.tool_calls.into_iter().map(|tc| crate::types::ToolCall {
-                id: tc.id,
-                r#type: tc.r#type,
-                function: crate::types::Function {
-                    name: tc.function.map(|f| f.name).unwrap_or_default(),
-                    arguments: "{}".to_string(), // TODO: Convert from protobuf Value
-                },
-            }).collect(),
-            tool_call_id: msg.tool_call_id,
+        .map(|msg| {
+            let tool_calls = if msg.tool_calls.is_empty() {
+                None
+            } else {
+                Some(msg.tool_calls.into_iter().map(|tc| crate::types::ToolCall {
+                    id: tc.id,
+                    tool_type: tc.r#type,
+                    function: crate::types::ToolCallFunction {
+                        name: tc.function.map(|f| f.name).unwrap_or_default(),
+                        arguments: "{}".to_string(), // TODO: Convert from protobuf Value
+                    },
+                }).collect())
+            };
+
+            crate::types::ChatMessage {
+                role: msg.role,
+                content: crate::types::MessageContent::Text(msg.content),
+                name: msg.name,
+                tool_calls,
+                tool_call_id: msg.tool_call_id,
+            }
         })
         .collect();
 
     Ok(crate::types::ChatCompletionRequest {
         model: req.model,
         messages,
-        temperature: req.temperature,
-        max_tokens: req.max_tokens,
-        top_p: req.top_p,
-        frequency_penalty: req.frequency_penalty,
-        presence_penalty: req.presence_penalty,
+        temperature: req.temperature.map(|v| v as f32),
+        max_tokens: req.max_tokens.map(|v| v as u32),
+        top_p: req.top_p.map(|v| v as f32),
+        frequency_penalty: req.frequency_penalty.map(|v| v as f32),
+        presence_penalty: req.presence_penalty.map(|v| v as f32),
         stop: if req.stop.is_empty() { None } else { Some(req.stop) },
         stream: req.stream,
         tools: None, // TODO: Convert tools
         tool_choice: None, // TODO: Convert tool choice
+        tags: None,
+        omen: None,
     })
 }
 
-fn convert_chat_response_to_grpc(resp: crate::types::ChatCompletionResponse) -> std::result::Result<ChatCompletionResponse, Status> {
+fn convert_chat_response_to_grpc(resp: crate::types::ChatCompletionResponse) -> std::result::Result<ProtoChatCompletionResponse, Status> {
     let choices = resp.choices
         .into_iter()
-        .map(|choice| ChatChoice {
-            index: choice.index,
-            message: Some(ChatMessage {
+        .map(|choice| ProtoChatChoice {
+            index: choice.index as i32,
+            message: Some(ProtoChatMessage {
                 role: choice.message.role,
-                content: choice.message.content,
+                content: choice.message.content.text(),
                 name: choice.message.name,
                 tool_calls: choice.message.tool_calls.unwrap_or_default()
                     .into_iter()
-                    .map(|tc| ToolCall {
+                    .map(|tc| ProtoToolCall {
                         id: tc.id,
-                        r#type: tc.r#type,
-                        function: Some(Function {
+                        r#type: tc.tool_type,
+                        function: Some(ProtoFunction {
                             name: tc.function.name,
                             description: None,
                             parameters: std::collections::HashMap::new(), // TODO: Parse arguments
@@ -276,13 +285,13 @@ fn convert_chat_response_to_grpc(resp: crate::types::ChatCompletionResponse) -> 
         })
         .collect();
 
-    Ok(ChatCompletionResponse {
+    Ok(ProtoChatCompletionResponse {
         id: resp.id,
         object: resp.object,
         created: resp.created,
         model: resp.model,
         choices,
-        usage: Some(Usage {
+        usage: Some(ProtoUsage {
             prompt_tokens: resp.usage.prompt_tokens,
             completion_tokens: resp.usage.completion_tokens,
             total_tokens: resp.usage.total_tokens,
@@ -291,19 +300,19 @@ fn convert_chat_response_to_grpc(resp: crate::types::ChatCompletionResponse) -> 
     })
 }
 
-fn convert_model_to_grpc(model: crate::types::Model) -> Model {
-    Model {
+fn convert_model_to_grpc(model: crate::types::Model) -> ProtoModel {
+    ProtoModel {
         id: model.id,
         object: model.object,
         created: model.created,
         owned_by: model.owned_by,
         provider: model.provider,
         context_length: model.context_length,
-        pricing: Some(ModelPricing {
+        pricing: Some(ProtoModelPricing {
             input_per_1k: model.pricing.input_per_1k,
             output_per_1k: model.pricing.output_per_1k,
         }),
-        capabilities: Some(ModelCapabilities {
+        capabilities: Some(ProtoModelCapabilities {
             vision: model.capabilities.vision,
             functions: model.capabilities.functions,
             streaming: model.capabilities.streaming,
@@ -321,7 +330,7 @@ fn create_request_context() -> crate::types::RequestContext {
     }
 }
 
-fn parse_sse_to_grpc_chunk(sse_text: &str) -> std::result::Result<ChatCompletionChunk, Status> {
+fn parse_sse_to_grpc_chunk(sse_text: &str) -> std::result::Result<ProtoChatCompletionChunk, Status> {
     // Parse SSE format: "data: {json}\n\n"
     for line in sse_text.lines() {
         if line.starts_with("data: ") {
@@ -333,16 +342,16 @@ fn parse_sse_to_grpc_chunk(sse_text: &str) -> std::result::Result<ChatCompletion
 
             match serde_json::from_str::<crate::types::ChatCompletionChunk>(json_str) {
                 Ok(chunk) => {
-                    return Ok(ChatCompletionChunk {
+                    return Ok(ProtoChatCompletionChunk {
                         id: chunk.id,
                         object: chunk.object,
                         created: chunk.created,
                         model: chunk.model,
                         choices: chunk.choices
                             .into_iter()
-                            .map(|choice| ChatChoiceDelta {
-                                index: choice.index,
-                                delta: Some(ChatMessageDelta {
+                            .map(|choice| ProtoChatChoiceDelta {
+                                index: choice.index as i32,
+                                delta: Some(ProtoChatMessageDelta {
                                     role: choice.delta.role,
                                     content: choice.delta.content,
                                     tool_calls: vec![], // TODO: Convert tool calls
@@ -363,6 +372,9 @@ fn parse_sse_to_grpc_chunk(sse_text: &str) -> std::result::Result<ChatCompletion
     Err(Status::internal("Invalid SSE chunk format"))
 }
 
+/// Starts the gRPC server on the specified address
+/// This is a public API function that will be used when gRPC is enabled
+#[allow(dead_code)]
 pub async fn start_grpc_server(
     router: Arc<OmenRouter>,
     addr: std::net::SocketAddr,

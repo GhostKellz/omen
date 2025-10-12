@@ -153,6 +153,7 @@ pub struct ImageUrl {
     pub detail: Option<String>,
 }
 
+#[allow(dead_code)]
 impl MessageContent {
     pub fn text(&self) -> String {
         match self {
@@ -464,6 +465,7 @@ impl Default for OmenConfig {
 
 // Internal types
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct RequestContext {
     pub request_id: Uuid,
     pub user_id: Option<String>,
@@ -481,6 +483,7 @@ pub enum ProviderType {
     Azure,
     Xai,
     Bedrock,
+    VertexAI,
 }
 
 impl std::fmt::Display for ProviderType {
@@ -493,6 +496,7 @@ impl std::fmt::Display for ProviderType {
             ProviderType::Azure => write!(f, "azure"),
             ProviderType::Xai => write!(f, "xai"),
             ProviderType::Bedrock => write!(f, "bedrock"),
+            ProviderType::VertexAI => write!(f, "vertexai"),
         }
     }
 }

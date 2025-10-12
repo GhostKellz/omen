@@ -1,0 +1,132 @@
+# ========================================
+# OMEN Configuration File
+# ========================================
+# This is an example configuration for OMEN.
+# Copy this to omen.toml and customize for your setup.
+#
+# Note: Environment variables will override these settings.
+# Use env:VAR_NAME to reference environment variables.
+
+[server]
+bind = "0.0.0.0"
+port = 8080
+workers = 8  # Number of worker threads (defaults to CPU count)
+timeout_seconds = 30
+
+[storage]
+db = "sqlite:///data/omen.db"
+# db = "postgres://user:pass@localhost/omen"
+redis = "redis://localhost:6379"
+
+[routing]
+# Prefer local Ollama for these intent types
+prefer_local_for = ["code", "regex", "tests"]
+
+# Monthly budget in USD (soft limit)
+budget_monthly_usd = 150.0
+
+# Per-provider soft limits (percentage of budget)
+[routing.soft_limits]
+anthropic = 70.0
+openai = 70.0
+
+# Auto-swap providers if budget exceeded
+auto_swap = false
+
+# ========================================
+# Provider Configurations
+# ========================================
+
+[providers.openai]
+enabled = true
+api_key = "env:OMEN_OPENAI_API_KEY"
+# base_url = "https://api.openai.com/v1"  # Optional override
+timeout_seconds = 30
+models = []  # Auto-discover if empty
+
+[providers.anthropic]
+enabled = true
+api_key = "env:OMEN_ANTHROPIC_API_KEY"
+# base_url = "https://api.anthropic.com/v1"  # Optional override
+timeout_seconds = 30
+models = []  # Auto-discover if empty
+
+[providers.google]
+enabled = true
+api_key = "env:OMEN_GOOGLE_API_KEY"
+timeout_seconds = 30
+models = []
+
+[providers.xai]
+enabled = true
+api_key = "env:OMEN_XAI_API_KEY"
+# base_url = "https://api.x.ai/v1"
+timeout_seconds = 30
+models = []
+
+[providers.azure]
+enabled = true
+endpoint = "env:OMEN_AZURE_OPENAI_ENDPOINT"
+api_key = "env:OMEN_AZURE_OPENAI_API_KEY"
+api_version = "2024-02-01"
+timeout_seconds = 30
+
+[providers.ollama]
+enabled = true
+endpoints = [
+    "http://localhost:11434",
+    # "http://ollama-4090:11434",
+    # "http://ollama-3070:11434"
+]
+models = [
+    "deepseek-coder:6.7b",
+    "llama3.1:8b-instruct",
+    "qwen2.5:7b-instruct",
+    "codellama:7b"
+]
+timeout_seconds = 60
+
+[providers.bedrock]
+enabled = false
+region = "env:AWS_REGION"
+access_key_id = "env:AWS_ACCESS_KEY_ID"
+secret_access_key = "env:AWS_SECRET_ACCESS_KEY"
+# session_token = "env:AWS_SESSION_TOKEN"  # Optional
+timeout_seconds = 30
+
+[providers.vertexai]
+enabled = false
+project_id = "env:OMEN_VERTEXAI_PROJECT_ID"
+location = "us-central1"
+access_token = "env:OMEN_VERTEXAI_ACCESS_TOKEN"
+timeout_seconds = 30
+
+# ========================================
+# Authentication (optional)
+# ========================================
+
+[auth]
+require_api_key = false
+# master_key = "env:OMEN_AUTH_MASTER_KEY"
+
+# ========================================
+# Logging
+# ========================================
+
+[logging]
+level = "info"  # trace, debug, info, warn, error
+enable_access_logs = true
+
+# ========================================
+# Redis Cache (optional)
+# ========================================
+
+[cache]
+enabled = true
+redis_url = "redis://localhost:6379"
+default_ttl_seconds = 3600  # 1 hour
+response_cache_ttl = 1800  # 30 minutes
+session_cache_ttl = 7200  # 2 hours
+rate_limit_ttl = 60  # 1 minute
+provider_health_ttl = 300  # 5 minutes
+max_cache_size_mb = 1024  # 1GB

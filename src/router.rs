@@ -25,6 +25,8 @@ pub struct OmenRouter {
     pub cache: Option<Arc<RedisCache>>,
 }
 
+/// OmenRouter implementation - all public methods are part of the API for clients
+#[allow(dead_code)]
 impl OmenRouter {
     pub async fn new(config: Config) -> Result<Self> {
         let providers = Arc::new(ProviderRegistry::new(&config).await?);
@@ -223,7 +225,7 @@ impl OmenRouter {
         }
 
         // Select provider (prefer OpenAI/Ollama for embeddings)
-        let provider = self.providers.get("openai")
+        let _provider = self.providers.get("openai")
             .or_else(|| self.providers.get("ollama"))
             .or_else(|| self.providers.all().first().cloned())
             .ok_or(OmenError::ProviderUnavailable("No providers available for embeddings".to_string()))?;
@@ -236,8 +238,8 @@ impl OmenRouter {
 
         // Generate embeddings (simplified - actual implementation would call provider)
         let mut data = Vec::new();
-        for (i, text) in texts.iter().enumerate() {
-            // TODO: Call actual provider embedding API
+        for (i, _text) in texts.iter().enumerate() {
+            // TODO: Call actual provider embedding API (_text will be used)
             // For now, return mock embeddings (1536 dimensions for OpenAI compatibility)
             let embedding = vec![0.0; 1536];
             data.push(EmbeddingData {

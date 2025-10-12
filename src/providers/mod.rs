@@ -13,6 +13,7 @@ pub mod bedrock;
 pub mod google;
 pub mod ollama;
 pub mod openai;
+pub mod vertexai;
 pub mod xai;
 
 pub use anthropic::AnthropicProvider;
@@ -21,6 +22,7 @@ pub use bedrock::BedrockProvider;
 pub use google::GoogleProvider;
 pub use ollama::OllamaProvider;
 pub use openai::OpenAIProvider;
+pub use vertexai::VertexAIProvider;
 pub use xai::XaiProvider;
 
 #[async_trait]
@@ -165,6 +167,21 @@ impl ProviderRegistry {
                     ).await?
                 );
                 providers.insert("bedrock".to_string(), provider);
+            }
+        }
+
+        // Initialize Vertex AI provider (Claude via Google Cloud)
+        if config.providers.vertexai.enabled {
+            if let Some(ref project_id) = config.providers.vertexai.project_id {
+                let provider = Arc::new(
+                    VertexAIProvider::new(
+                        project_id.clone(),
+                        config.providers.vertexai.location.clone(),
+                        config.providers.vertexai.access_token.clone(),
+                        config.providers.vertexai.timeout_seconds,
+                    ).await?
+                );
+                providers.insert("vertexai".to_string(), provider);
             }
         }
 

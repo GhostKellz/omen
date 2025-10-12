@@ -64,6 +64,8 @@ pub struct ProvidersConfig {
     pub xai: ProviderConfig,
     #[serde(default)]
     pub bedrock: BedrockConfig,
+    #[serde(default)]
+    pub vertexai: VertexAIConfig,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -118,6 +120,20 @@ pub struct BedrockConfig {
     pub secret_access_key: Option<String>,
     #[serde(default)]
     pub session_token: Option<String>,
+    #[serde(default = "default_timeout")]
+    pub timeout_seconds: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct VertexAIConfig {
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(default)]
+    pub project_id: Option<String>,
+    #[serde(default)]
+    pub location: Option<String>,
+    #[serde(default)]
+    pub access_token: Option<String>,
     #[serde(default = "default_timeout")]
     pub timeout_seconds: u64,
 }
@@ -364,6 +380,7 @@ impl Default for Config {
                 azure: AzureConfig::default(),
                 xai: ProviderConfig::default(),
                 bedrock: BedrockConfig::default(),
+                vertexai: VertexAIConfig::default(),
             },
             auth: AuthConfig::default(),
             logging: LoggingConfig::default(),

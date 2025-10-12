@@ -4,12 +4,13 @@ use crate::{
 };
 use redis::{Client, Commands, Connection};
 use serde::{Deserialize, Serialize};
-use std::{sync::Arc, time::Duration};
+use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{debug, info, warn};
 use uuid::Uuid;
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct CacheConfig {
     pub redis_url: String,
     pub default_ttl_seconds: u64,
@@ -77,6 +78,8 @@ impl std::fmt::Debug for RedisCache {
     }
 }
 
+/// RedisCache implementation - all public methods are part of the caching API
+#[allow(dead_code)]
 impl RedisCache {
     pub fn new(config: CacheConfig) -> Result<Self> {
         let client = Client::open(config.redis_url.clone())
@@ -402,7 +405,8 @@ impl RedisCache {
     }
 }
 
-// Cache key generation utilities
+// Cache key generation utilities - all methods are part of the API
+#[allow(dead_code)]
 impl RedisCache {
     pub fn generate_response_cache_key(
         &self,
