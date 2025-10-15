@@ -11,7 +11,6 @@ Cargo.lock
 #/target
 CLAUDE.md
 TODO.md
-RC1_STATUS.md
 .env
 *.env
 
