@@ -7,6 +7,7 @@ mod auth;
 mod billing;
 mod cache;
 mod config;
+mod context;  // NEW: Workspace and session management
 mod error;
 mod ghost_ai;
 mod grpc;

@@ -5,7 +5,10 @@ use thiserror::Error;
 #[derive(Error, Debug)]
 pub enum OmenError {
     #[error("Configuration error: {0}")]
-    Config(#[from] config::ConfigError),
+    Config(String),
+
+    #[error("Database error: {0}")]
+    Database(String),
 
     #[error("Provider error: {0}")]
     Provider(String),

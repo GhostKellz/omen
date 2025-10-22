@@ -224,7 +224,7 @@ impl StreamMultiplexer {
         tokio::spawn(async move {
             let mut winner: Option<String> = None;
             let mut total_cost = 0.0;
-            let mut token_count = 0;
+            let mut token_count = 0;  // Reserved for future token tracking
             let race_start = Instant::now();
 
             // Apply global timeout

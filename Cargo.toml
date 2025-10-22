@@ -73,6 +73,15 @@ tokio-stream = { version = "0.1", features = ["full"] }
 # Redis caching
 redis = { version = "0.24", features = ["tokio-comp", "json"] }
 
+# SQLite for session history and embeddings
+sqlx = { version = "0.7", features = ["runtime-tokio-native-tls", "sqlite"] }
+
+# YAML parsing for workspace config
+serde_yaml = "0.9"
+
+# Binary serialization for embeddings
+bincode = "1.3"
+
 # Future QUIC support (commented out for now due to version conflicts)
 # quinn = "0.11"
 # h3 = "0.0.8"

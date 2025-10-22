@@ -10,6 +10,7 @@ pub mod auth;
 pub mod billing;
 pub mod cache;
 pub mod config;
+pub mod context;  // NEW: Workspace and session management
 pub mod error;
 pub mod ghost_ai;
 pub mod grpc;
